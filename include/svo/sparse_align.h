@@ -74,11 +74,11 @@ protected:
   std::vector<bool> visible_fts_;
 
   void precomputeReferencePatches();
-  void optimize(SE3& model);
+  void optimize(SE3d& model);
   void reset();
-  double computeResiduals(const SE3& model, bool linearize_system, bool compute_weight_scale = false);
+  double computeResiduals(const SE3d& model, bool linearize_system, bool compute_weight_scale = false);
   int solve();
-  void update (const SE3& old_model, SE3& new_model);
+  void update (const SE3d& old_model, SE3d& new_model);
   void startIteration();
   void finishIteration();
 };

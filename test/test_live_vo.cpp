@@ -23,7 +23,7 @@
 #include <svo/math_lib.h>
 #include <svo/camera_model.h>
 #include <opencv2/opencv.hpp>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 #include <iostream>
 
 #include <svo/slamviewer.h>
@@ -109,7 +109,7 @@ void BenchmarkNode::runFromFolder()
             std::cout << "Frame-Id: " << vo_->lastFrame()->id_ << " \t"
                       << "#Features: " << vo_->lastNumObservations() << " \n";
             //<< "Proc. Time: " << vo_->lastProcessingTime()*1000 << "ms \n";
-            std::cout<<"Frame pose: "<< vo_->lastFrame()->T_f_w_ <<std::endl;
+            std::cout<<"Frame pose: "<< vo_->lastFrame()->T_f_w_.matrix() <<std::endl;
 
         }
 

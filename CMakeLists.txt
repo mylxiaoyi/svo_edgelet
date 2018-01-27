@@ -26,7 +26,7 @@ IF(DEBUG_OUTPUT)
 ENDIF()
 
 # Set build flags, set ARM_ARCHITECTURE environment variable on Odroid
-SET(CMAKE_CXX_FLAGS "-Wall -D_LINUX -D_REENTRANT -march=native -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unknown-pragmas")
+SET(CMAKE_CXX_FLAGS "-g -Wall -D_LINUX -D_REENTRANT -march=native -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unknown-pragmas")
 IF(DEFINED ENV{ARM_ARCHITECTURE})
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon -march=armv7-a")
 ELSE()
@@ -99,7 +99,6 @@ LIST(APPEND SOURCEFILES
   src/faster_corner_10_sse.cpp
 
   src/slamviewer.cpp
-  src/five-point.cpp
   src/precomp.cpp
   src/modelest.cpp
   )

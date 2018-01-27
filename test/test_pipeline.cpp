@@ -23,7 +23,7 @@
 #include <svo/math_lib.h>
 #include <svo/camera_model.h>
 #include <opencv2/opencv.hpp>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 #include <iostream>
 
 #include <svo/slamviewer.h>
@@ -79,6 +79,8 @@ public:
 };
 
 BenchmarkNode::BenchmarkNode()
+    : cam_(nullptr), cam_pinhole_(nullptr), vo_(nullptr),
+      viewer_(nullptr), viewer_thread_(nullptr)
 {
 
   //tum rgbd dataset fr2
@@ -106,12 +108,27 @@ BenchmarkNode::BenchmarkNode()
 
 BenchmarkNode::~BenchmarkNode()
 {
-  delete vo_;
-  delete cam_;
-  delete cam_pinhole_;
+  if (vo_) {
+      delete vo_;
+      std::cout << "delete vo_" << std::endl;;
+  }
+  if (cam_) {
+      delete cam_;
+      std::cout << "delete cam_" << std::endl;
+  }
+  if (cam_pinhole_) {
+      delete cam_pinhole_;
+      std::cout << "delete cam_pinhole_" << std::endl;
+  }
 
-  delete viewer_;
-  delete viewer_thread_;
+  if (viewer_) {
+      delete viewer_;
+      std::cout << "delete viewer_" << std::endl;
+  }
+  if (viewer_thread_) {
+      delete viewer_thread_;
+      std::cout << "delete viewer_thread_" << std::endl;
+  }
 }
 
 #define TXTREAD
@@ -120,7 +137,7 @@ void BenchmarkNode::runFromFolder()
 #ifdef TXTREAD  // read image filename with txt, TUM rgbd datasets
   std::vector<std::string> vstrImageFilenames;
   std::vector<double> vTimestamps;
-  std::string filepath = std::string("/media/hyj/dataset/datasets/freiburg2_desk");
+  std::string filepath = std::string("/media/datadisk/dataset/tum_rgbd/all_tgzs/rgbd_dataset_freiburg1_xyz");
   std::string strFile = filepath + "/rgb.txt";
   LoadImages(strFile, vstrImageFilenames, vTimestamps);
 
@@ -185,6 +202,7 @@ int main(int argc, char** argv)
 {
     svo::BenchmarkNode benchmark;
     benchmark.runFromFolder();
+    std::cout << "Done" << std::endl;
 
   return 0;
 }

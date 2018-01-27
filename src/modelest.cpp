@@ -70,15 +70,22 @@ void CvModelEstimator2::setSeed( int64 seed )
 }
 
 
-int CvModelEstimator2::findInliers( const CvMat* m1, const CvMat* m2,
-                                    const CvMat* model, CvMat* _err,
-                                    CvMat* _mask, double threshold )
+int CvModelEstimator2::findInliers( const cv::Mat& m1, const cv::Mat& m2,
+                                    const cv::Mat& model, cv::Mat& _err,
+                                    cv::Mat& _mask, double threshold )
 {
-    int i, count = _err->rows*_err->cols, goodCount = 0;
-    const float* err = _err->data.fl;
-    uchar* mask = _mask->data.ptr;
+//    int i, count = _err->rows*_err->cols, goodCount = 0;
+//    const float* err = _err->data.fl;
+//    uchar* mask = _mask->data.ptr;
+    int i;
+    int count = _err.rows*_err.cols;
+    int goodCount = 0;
+    const float* err = (float*)(_err.data);
+    uchar* mask = _mask.data;
 
+    std::cout << "before computeReprojError " << __FILE__ << ":" << __LINE__ << std::endl;
     computeReprojError( m1, m2, model, _err );
+    std::cout << "after computeReprojError" << std::endl;
     threshold *= threshold;
     for( i = 0; i < count; i++ )
         goodCount += mask[i] = err[i] <= threshold;
@@ -111,36 +118,45 @@ cvRANSACUpdateNumIters( double p, double ep,
         max_iters : cvRound(num/denom);
 }
 
-bool CvModelEstimator2::runRANSAC( const CvMat* m1, const CvMat* m2, CvMat* model,
-                                    CvMat* mask0, double reprojThreshold,
+bool CvModelEstimator2::runRANSAC( const cv::Mat& m1, const cv::Mat& m2, cv::Mat& model,
+                                    cv::Mat& mask0, double reprojThreshold,
                                     double confidence, int maxIters )
 {
     bool result = false;
-    cv::Ptr<CvMat> mask = cvCloneMat(mask0);
-    cv::Ptr<CvMat> models, err, tmask;
-    cv::Ptr<CvMat> ms1, ms2;
+//    cv::Ptr<CvMat> mask = cvCloneMat(mask0);
+//    cv::Ptr<CvMat> models, err, tmask;
+//    cv::Ptr<CvMat> ms1, ms2;
+    cv::Mat mask = mask0.clone();
+    cv::Mat models, err, tmask;
+    cv::Mat ms1, ms2;
 
     int iter, niters = maxIters;
-    int count = m1->rows*m1->cols, maxGoodCount = 0;
-    CV_Assert( CV_ARE_SIZES_EQ(m1, m2) && CV_ARE_SIZES_EQ(m1, mask) );
+//    int count = m1->rows*m1->cols, maxGoodCount = 0;
+    int count = m1.rows*m1.cols, maxGoodCount = 0;
+//    CV_Assert( CV_ARE_SIZES_EQ(m1, m2) && CV_ARE_SIZES_EQ(m1, mask) );
 
     if( count < modelPoints )
         return false;
 
-    models = cvCreateMat( modelSize.height*maxBasicSolutions, modelSize.width, CV_64FC1 );
-    err = cvCreateMat( 1, count, CV_32FC1 );
-    tmask = cvCreateMat( 1, count, CV_8UC1 );
+//    models = cvCreateMat( modelSize.height*maxBasicSolutions, modelSize.width, CV_64FC1 );
+//    err = cvCreateMat( 1, count, CV_32FC1 );
+//    tmask = cvCreateMat( 1, count, CV_8UC1 );
+    std::cout << "modelSize height = " << modelSize.height << ", width = " << modelSize.width << std::endl;
+    std::cout << "maxBasicSolutions = " << maxBasicSolutions << std::endl;
+    models.create(modelSize.height*maxBasicSolutions, modelSize.width, CV_64FC1 );
+    err.create( 1, count, CV_32FC1 );
+    tmask.create( 1, count, CV_8UC1 );
 
     if( count > modelPoints )
     {
-        ms1 = cvCreateMat( 1, modelPoints, m1->type );
-        ms2 = cvCreateMat( 1, modelPoints, m2->type );
+        ms1.create( 1, modelPoints, m1.type() );
+        ms2.create(1, modelPoints, m2.type() );
     }
     else
     {
         niters = 1;
-        ms1 = cvCloneMat(m1);
-        ms2 = cvCloneMat(m2);
+        ms1 = m1.clone();
+        ms2 = m2.clone();
     }
 
     for( iter = 0; iter < niters; iter++ )
@@ -160,16 +176,23 @@ bool CvModelEstimator2::runRANSAC( const CvMat* m1, const CvMat* m2, CvMat* mode
         nmodels = runKernel( ms1, ms2, models );  // find n model
         if( nmodels <= 0 )
             continue;
+        std::cout << "models rows = " << models.rows << ", cols = " << models.cols << std::endl;
+        std::cout << "nmodels = " << nmodels << std::endl;
         for( i = 0; i < nmodels; i++ )
         {
-            CvMat model_i;
-            cvGetRows( models, &model_i, i*modelSize.height, (i+1)*modelSize.height );
-            goodCount = findInliers( m1, m2, &model_i, err, tmask, reprojThreshold );
+//            CvMat model_i;
+//            cvGetRows( models, &model_i, i*modelSize.height, (i+1)*modelSize.height );
+            cv::Mat model_i;
+            model_i = models.row(i);
+            std::cout << "before findInliers " << __FILE__ << ":" << __LINE__ << std::endl;
+            goodCount = findInliers( m1, m2, model_i, err, tmask, reprojThreshold );
+            std::cout << "after findINliers" << std::endl;
 
             if( goodCount > MAX(maxGoodCount, modelPoints-1) )
             {
                 std::swap(tmask, mask);
-                cvCopy( &model_i, model );
+//                cvCopy( &model_i, model );
+                model_i.copyTo(model);
                 maxGoodCount = goodCount;
                 niters = cvRANSACUpdateNumIters( confidence,
                     (double)(count - goodCount)/count, modelPoints, niters );
@@ -179,8 +202,9 @@ bool CvModelEstimator2::runRANSAC( const CvMat* m1, const CvMat* m2, CvMat* mode
 
     if( maxGoodCount > 0 )
     {
-        if( mask != mask0 )
-            cvCopy( mask, mask0 );
+//        if( mask != mask0 )
+//            cvCopy( mask, mask0 );
+        mask.copyTo(mask0);
         result = true;
     }
 
@@ -188,39 +212,42 @@ bool CvModelEstimator2::runRANSAC( const CvMat* m1, const CvMat* m2, CvMat* mode
 }
 
 
-static CV_IMPLEMENT_QSORT( icvSortDistances, int, CV_LT )
+//static CV_IMPLEMENT_QSORT( icvSortDistances, int, CV_LT )
 
-bool CvModelEstimator2::runLMeDS( const CvMat* m1, const CvMat* m2, CvMat* model,
-                                  CvMat* mask, double confidence, int maxIters )
+bool CvModelEstimator2::runLMeDS( const cv::Mat& m1, const cv::Mat& m2, cv::Mat& model,
+                                  cv::Mat& mask, double confidence, int maxIters )
 {
     const double outlierRatio = 0.45;
     bool result = false;
-    cv::Ptr<CvMat> models;
-    cv::Ptr<CvMat> ms1, ms2;
-    cv::Ptr<CvMat> err;
+//    cv::Ptr<CvMat> models;
+//    cv::Ptr<CvMat> ms1, ms2;
+//    cv::Ptr<CvMat> err;
+    cv::Mat models;
+    cv::Mat ms1, ms2;
+    cv::Mat err;
 
     int iter, niters = maxIters;
-    int count = m1->rows*m1->cols;
+    int count = m1.rows*m1.cols;
     double minMedian = DBL_MAX, sigma;
 
-    CV_Assert( CV_ARE_SIZES_EQ(m1, m2) && CV_ARE_SIZES_EQ(m1, mask) );
+//    CV_Assert( CV_ARE_SIZES_EQ(m1, m2) && CV_ARE_SIZES_EQ(m1, mask) );
 
     if( count < modelPoints )
         return false;
 
-    models = cvCreateMat( modelSize.height*maxBasicSolutions, modelSize.width, CV_64FC1 );
-    err = cvCreateMat( 1, count, CV_32FC1 );
+    models.create(modelSize.height*maxBasicSolutions, modelSize.width, CV_64FC1 );
+    err.create(1, count, CV_32FC1 );
 
     if( count > modelPoints )
     {
-        ms1 = cvCreateMat( 1, modelPoints, m1->type );
-        ms2 = cvCreateMat( 1, modelPoints, m2->type );
+        ms1.create(1, modelPoints, m1.type());
+        ms2.create(1, modelPoints, m2.type());
     }
     else
     {
         niters = 1;
-        ms1 = cvCloneMat(m1);
-        ms2 = cvCloneMat(m2);
+        ms1 = m1.clone();
+        ms2 = m2.clone();
     }
 
     niters = cvRound(log(1-confidence)/log(1-pow(1-outlierRatio,(double)modelPoints)));
@@ -245,18 +272,22 @@ bool CvModelEstimator2::runLMeDS( const CvMat* m1, const CvMat* m2, CvMat* model
             continue;
         for( i = 0; i < nmodels; i++ )
         {
-            CvMat model_i;
-            cvGetRows( models, &model_i, i*modelSize.height, (i+1)*modelSize.height );
-            computeReprojError( m1, m2, &model_i, err );
-            icvSortDistances( err->data.i, count, 0 );
+//            CvMat model_i;
+//            cvGetRows( models, &model_i, i*modelSize.height, (i+1)*modelSize.height );
+            cv::Mat model_i;
+            model_i = models.row(i);
+            computeReprojError( m1, m2, model_i, err );
+//            icvSortDistances( err->data.i, count, 0 );
+            std::sort((int*)(err.data), (int*)(err.data+count));
 
             double median = count % 2 != 0 ?
-                err->data.fl[count/2] : (err->data.fl[count/2-1] + err->data.fl[count/2])*0.5;
+                err.data[count/2] : (err.data[count/2-1] + err.data[count/2])*0.5;
 
             if( median < minMedian )
             {
                 minMedian = median;
-                cvCopy( &model_i, model );
+//                cvCopy( &model_i, model );
+                model_i.copyTo(model);
             }
         }
     }
@@ -274,18 +305,20 @@ bool CvModelEstimator2::runLMeDS( const CvMat* m1, const CvMat* m2, CvMat* model
 }
 
 
-bool CvModelEstimator2::getSubset( const CvMat* m1, const CvMat* m2,
-                                   CvMat* ms1, CvMat* ms2, int maxAttempts )
+bool CvModelEstimator2::getSubset( const cv::Mat& m1, const cv::Mat& m2,
+                                   cv::Mat& ms1, cv::Mat& ms2, int maxAttempts )
 {
     cv::AutoBuffer<int> _idx(modelPoints);
     int* idx = _idx;
     int i = 0, j, k, idx_i, iters = 0;
-    int type = CV_MAT_TYPE(m1->type), elemSize = CV_ELEM_SIZE(type);
-    const int *m1ptr = m1->data.i, *m2ptr = m2->data.i;
-    int *ms1ptr = ms1->data.i, *ms2ptr = ms2->data.i;
-    int count = m1->cols*m1->rows;
+//    int type = CV_MAT_TYPE(m1->type), elemSize = CV_ELEM_SIZE(type);
+    int type = m1.type();
+    int elemSize = m1.elemSize();
+    const int *m1ptr = (int*)(m1.data), *m2ptr = (int*)(m2.data);
+    int *ms1ptr = (int*)(ms1.data), *ms2ptr = (int*)(ms2.data);
+    int count = m1.cols*m1.rows;
 
-    assert( CV_IS_MAT_CONT(m1->type & m2->type) && (elemSize % sizeof(int) == 0) );
+//    assert( CV_IS_MAT_CONT(m1->type & m2->type) && (elemSize % sizeof(int) == 0) );
     elemSize /= sizeof(int);
 
     for(; iters < maxAttempts; iters++)
@@ -320,12 +353,12 @@ bool CvModelEstimator2::getSubset( const CvMat* m1, const CvMat* m2,
 }
 
 
-bool CvModelEstimator2::checkSubset( const CvMat* m, int count )
+bool CvModelEstimator2::checkSubset(const cv::Mat &m, int count )
 {
     int j, k, i, i0, i1;
-    CvPoint2D64f* ptr = (CvPoint2D64f*)m->data.ptr;
+    CvPoint2D64f* ptr = (CvPoint2D64f*)(m.data);
 
-    assert( CV_MAT_TYPE(m->type) == CV_64FC2 );
+    assert( m.type() == CV_64FC2 );
 
     if( checkPartialSubsets )
         i0 = i1 = count - 1;
@@ -363,17 +396,17 @@ class Affine3DEstimator : public CvModelEstimator2
 {
 public:
     Affine3DEstimator() : CvModelEstimator2(4, cvSize(4, 3), 1) {}
-    virtual int runKernel( const CvMat* m1, const CvMat* m2, CvMat* model );
+    virtual int runKernel( const cv::Mat& m1, const cv::Mat& m2, cv::Mat& model );
 protected:
-    virtual void computeReprojError( const CvMat* m1, const CvMat* m2, const CvMat* model, CvMat* error );
-    virtual bool checkSubset( const CvMat* ms1, int count );
+    virtual void computeReprojError( const cv::Mat& m1, const cv::Mat& m2, const cv::Mat& model, cv::Mat& error );
+    virtual bool checkSubset( const cv::Mat& ms1, int count );
 };
 
 
-int Affine3DEstimator::runKernel( const CvMat* m1, const CvMat* m2, CvMat* model )
+int Affine3DEstimator::runKernel(const cv::Mat &m1, const cv::Mat &m2, cv::Mat &model )
 {
-    const cv::Point3d* from = reinterpret_cast<const cv::Point3d*>(m1->data.ptr);
-    const cv::Point3d* to   = reinterpret_cast<const cv::Point3d*>(m2->data.ptr);
+    const cv::Point3d* from = reinterpret_cast<const cv::Point3d*>(m1.data);
+    const cv::Point3d* to   = reinterpret_cast<const cv::Point3d*>(m2.data);
 
     cv::Mat A(12, 12, CV_64F);
     cv::Mat B(12, 1, CV_64F);
@@ -392,22 +425,23 @@ int Affine3DEstimator::runKernel( const CvMat* m1, const CvMat* m2, CvMat* model
         }
     }
 
-    CvMat cvA = A;
-    CvMat cvB = B;
-    CvMat cvX;
-    cvReshape(model, &cvX, 1, 12);
+    cv::Mat cvA = A;
+    cv::Mat cvB = B;
+    cv::Mat cvX;
+//    cvReshape(model, &cvX, 1, 12);
+    cvX = model.reshape(1, 12);
     cvSolve(&cvA, &cvB, &cvX, CV_SVD );
 
     return 1;
 }
 
-void Affine3DEstimator::computeReprojError( const CvMat* m1, const CvMat* m2, const CvMat* model, CvMat* error )
+void Affine3DEstimator::computeReprojError(const cv::Mat &m1, const cv::Mat &m2, const cv::Mat &model, cv::Mat &error )
 {
-    int count = m1->rows * m1->cols;
-    const cv::Point3d* from = reinterpret_cast<const cv::Point3d*>(m1->data.ptr);
-    const cv::Point3d* to   = reinterpret_cast<const cv::Point3d*>(m2->data.ptr);
-    const double* F = model->data.db;
-    float* err = error->data.fl;
+    int count = m1.rows * m1.cols;
+    const cv::Point3d* from = reinterpret_cast<const cv::Point3d*>(m1.data);
+    const cv::Point3d* to   = reinterpret_cast<const cv::Point3d*>(m2.data);
+    const double* F = (double*)(model.data);
+    float* err = (float*)(error.data);
 
     for(int i = 0; i < count; i++ )
     {
@@ -422,12 +456,12 @@ void Affine3DEstimator::computeReprojError( const CvMat* m1, const CvMat* m2, co
     }
 }
 
-bool Affine3DEstimator::checkSubset( const CvMat* ms1, int count )
+bool Affine3DEstimator::checkSubset(const cv::Mat &ms1, int count )
 {
-    CV_Assert( CV_MAT_TYPE(ms1->type) == CV_64FC3 );
+    CV_Assert( ms1.type() == CV_64FC3 );
 
     int j, k, i = count - 1;
-    const cv::Point3d* ptr = reinterpret_cast<const cv::Point3d*>(ms1->data.ptr);
+    const cv::Point3d* ptr = reinterpret_cast<const cv::Point3d*>(ms1.data);
 
     // check that the i-th selected point does not belong
     // to a line connecting some previously selected points
@@ -472,16 +506,16 @@ int estimateAffine3D(cv::InputArray _from, cv::InputArray _to,
     from.convertTo(dFrom, CV_64F);
     to.convertTo(dTo, CV_64F);
 
-    CvMat F3x4 = out;
-    CvMat mask  = inliers;
-    CvMat m1 = dFrom;
-    CvMat m2 = dTo;
+    cv::Mat F3x4 = out;
+    cv::Mat mask  = inliers;
+    cv::Mat m1 = dFrom;
+    cv::Mat m2 = dTo;
 
     const double epsilon = numeric_limits<double>::epsilon();
     param1 = param1 <= 0 ? 3 : param1;
     param2 = (param2 < epsilon) ? 0.99 : (param2 > 1 - epsilon) ? 0.99 : param2;
 
-    return Affine3DEstimator().runRANSAC(&m1, &m2, &F3x4, &mask, param1, param2 );
+    return Affine3DEstimator().runRANSAC(m1, m2, F3x4, mask, param1, param2 );
 }
 
 }
